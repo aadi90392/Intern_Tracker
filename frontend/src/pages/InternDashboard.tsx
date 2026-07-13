@@ -1,13 +1,24 @@
 import { useState, useEffect, useContext } from 'react';
-import { LogOut, Send, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import api from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
+import { StatusStamp } from '../components/StatusStamp';
 import type { Task } from '../types';
+
+const today = () => new Date().toISOString().slice(0, 10);
 
 const InternDashboard = () => {
   const auth = useContext(AuthContext);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [form, setForm] = useState({ taskTitle: '', description: '', githubLink: '', status: 'In Progress' });
+  const [form, setForm] = useState({
+    taskTitle: '',
+    description: '',
+    githubLink: '',
+    status: 'In Progress' as 'Completed' | 'In Progress' | 'Blocked',
+    date: today(),
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState('');
 
   const fetchTasks = async () => {
     try {
@@ -22,77 +33,146 @@ const InternDashboard = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
+    setFeedback('');
     try {
       await api.post('/intern/task', form);
-      alert('Task Logged!');
-      setForm({ taskTitle: '', description: '', githubLink: '', status: 'In Progress' });
-      fetchTasks(); // Refresh table
+      setFeedback('Entry logged.');
+      setForm({ taskTitle: '', description: '', githubLink: '', status: 'In Progress', date: today() });
+      fetchTasks();
     } catch (err) {
-      alert('Failed to submit task');
+      setFeedback('Could not log entry. Check the form and try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm px-8 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-gray-800">Hi, {auth?.user?.name} 👋</h1>
-        <button onClick={() => auth?.logout()} className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition">
-          <LogOut size={20} /> Logout
+    <div className="min-h-screen bg-paper">
+      <nav className="border-b border-line px-6 py-4 flex justify-between items-center bg-paper-raised">
+        <div>
+          <span className="font-display text-xs tracking-[0.2em] text-ink/50 uppercase block">Intern Log</span>
+          <span className="font-display text-base font-semibold">{auth?.user?.name}</span>
+        </div>
+        <button onClick={() => auth?.logout()} className="flex items-center gap-2 text-sm font-display uppercase tracking-wider text-ink/50 hover:text-stamp-blocked transition">
+          <LogOut size={16} /> Sign out
         </button>
       </nav>
 
-      <div className="max-w-6xl mx-auto p-8 grid md:grid-cols-3 gap-8">
-        {/* Form Section */}
-        <div className="md:col-span-1">
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-            <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><Send size={20} className="text-indigo-600"/> Log Daily Task</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <input className="w-full border rounded-lg p-3 text-sm outline-none focus:border-indigo-500" placeholder="Task Title" value={form.taskTitle} onChange={e => setForm({...form, taskTitle: e.target.value})} required />
-              <textarea className="w-full border rounded-lg p-3 text-sm outline-none focus:border-indigo-500 h-24" placeholder="Description (optional)" value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
-              <input className="w-full border rounded-lg p-3 text-sm outline-none focus:border-indigo-500" placeholder="GitHub Link (optional)" type="url" value={form.githubLink} onChange={e => setForm({...form, githubLink: e.target.value})} />
-              <select className="w-full border rounded-lg p-3 text-sm outline-none focus:border-indigo-500" value={form.status} onChange={e => setForm({...form, status: e.target.value})}>
-                <option value="In Progress">In Progress</option>
-                <option value="Completed">Completed</option>
-                <option value="Blocked">Blocked</option>
-              </select>
-              <button className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 transition">Submit Report</button>
+      <div className="max-w-5xl mx-auto p-6 md:p-10 grid md:grid-cols-5 gap-8">
+        {/* Entry form */}
+        <div className="md:col-span-2">
+          <div className="border border-line bg-paper-raised">
+            <div className="border-b border-line px-5 py-3 flex items-center gap-3">
+              <span className="font-display text-[11px] tracking-[0.2em] text-accent uppercase">New Entry</span>
+              <div className="h-px flex-1 bg-line" />
+            </div>
+            <form onSubmit={handleSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block font-display text-[11px] uppercase tracking-widest text-ink/50 mb-1.5">Date</label>
+                <input
+                  type="date"
+                  required
+                  max={today()}
+                  value={form.date}
+                  onChange={e => setForm({ ...form, date: e.target.value })}
+                  className="w-full border border-line px-3.5 py-2.5 text-sm font-body outline-none focus:border-accent focus:ring-1 focus:ring-accent transition"
+                />
+              </div>
+              <div>
+                <label className="block font-display text-[11px] uppercase tracking-widest text-ink/50 mb-1.5">Task title</label>
+                <input
+                  className="w-full border border-line px-3.5 py-2.5 text-sm font-body outline-none focus:border-accent focus:ring-1 focus:ring-accent transition"
+                  placeholder="What did you work on?"
+                  value={form.taskTitle}
+                  onChange={e => setForm({ ...form, taskTitle: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block font-display text-[11px] uppercase tracking-widest text-ink/50 mb-1.5">Description</label>
+                <textarea
+                  className="w-full border border-line px-3.5 py-2.5 text-sm font-body outline-none focus:border-accent focus:ring-1 focus:ring-accent transition h-20 resize-none"
+                  placeholder="Optional detail"
+                  value={form.description}
+                  onChange={e => setForm({ ...form, description: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block font-display text-[11px] uppercase tracking-widest text-ink/50 mb-1.5">GitHub link</label>
+                <input
+                  type="url"
+                  className="w-full border border-line px-3.5 py-2.5 text-sm font-body outline-none focus:border-accent focus:ring-1 focus:ring-accent transition"
+                  placeholder="Optional"
+                  value={form.githubLink}
+                  onChange={e => setForm({ ...form, githubLink: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block font-display text-[11px] uppercase tracking-widest text-ink/50 mb-1.5">Status</label>
+                <select
+                  className="w-full border border-line px-3.5 py-2.5 text-sm font-body outline-none focus:border-accent focus:ring-1 focus:ring-accent transition bg-paper-raised"
+                  value={form.status}
+                  onChange={e => setForm({ ...form, status: e.target.value as typeof form.status })}
+                >
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Blocked">Blocked</option>
+                </select>
+              </div>
+
+              {feedback && <p className="text-sm font-body text-ink/60">{feedback}</p>}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full bg-accent text-paper-raised py-2.5 font-display text-sm font-semibold uppercase tracking-wider hover:bg-ink transition disabled:opacity-50"
+              >
+                {submitting ? 'Logging…' : 'Log entry'}
+              </button>
             </form>
           </div>
         </div>
 
-        {/* Table Section */}
-        <div className="md:col-span-2">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-bold">My Recent Tasks</h2></div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50 text-gray-600">
-                  <tr>
-                    <th className="p-4 font-medium">Date</th>
-                    <th className="p-4 font-medium">Task</th>
-                    <th className="p-4 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {tasks.map((t) => (
-                    <tr key={t._id} className="hover:bg-gray-50 transition">
-                      <td className="p-4 text-gray-500">{new Date(t.date).toLocaleDateString()}</td>
-                      <td className="p-4 font-medium text-gray-800">{t.taskTitle}</td>
-                      <td className="p-4">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-                          t.status === 'Completed' ? 'bg-green-100 text-green-700' :
-                          t.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
-                        }`}>
-                          {t.status === 'Completed' && <CheckCircle2 size={14} />}
-                          {t.status === 'In Progress' && <Clock size={14} />}
-                          {t.status === 'Blocked' && <AlertCircle size={14} />}
-                          {t.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {/* Ledger */}
+        <div className="md:col-span-3">
+          <div className="border border-line bg-paper-raised">
+            <div className="border-b border-line px-5 py-3 flex items-center gap-3">
+              <span className="font-display text-[11px] tracking-[0.2em] text-accent uppercase">Your Record</span>
+              <div className="h-px flex-1 bg-line" />
+              <span className="font-display text-[11px] text-ink/40">{tasks.length} entries</span>
+            </div>
+
+            <div className="divide-y divide-line">
+              {tasks.map((t, i) => (
+                <div key={t._id} className="px-5 py-4 flex gap-4 items-start">
+                  <span className="font-display text-xs text-ink/30 pt-0.5 w-8 shrink-0">
+                    {String(tasks.length - i).padStart(3, '0')}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-3 mb-1">
+                      <span className="font-body font-medium text-sm truncate">{t.taskTitle}</span>
+                      <StatusStamp status={t.status} />
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-ink/50 font-display">
+                      <span>{new Date(t.date).toLocaleDateString()}</span>
+                      {t.githubLink && (
+                        <>
+                          <span>·</span>
+                          <a href={t.githubLink} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                            View link
+                          </a>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {tasks.length === 0 && (
+                <div className="px-5 py-12 text-center text-sm text-ink/40 font-body">
+                  No entries yet — log your first task to the left.
+                </div>
+              )}
             </div>
           </div>
         </div>
