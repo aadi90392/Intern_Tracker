@@ -7,15 +7,18 @@ const taskSchema = z.object({
   taskTitle: z.string().min(3),
   description: z.string().optional(),
   githubLink: z.string().url().optional(),
-  status: z.enum(['Completed', 'In Progress', 'Blocked'])
+  status: z.enum(['Completed', 'In Progress', 'Blocked']),
+  date: z.string().optional() 
 });
 
 export const submitTask = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const parsedData = taskSchema.parse(req.body);
+    const { date, ...rest } = taskSchema.parse(req.body);
+
     const newEntry = await Timesheet.create({
       internId: req.user?.id,
-      ...parsedData
+      ...rest,
+      date: date ? new Date(date) : new Date()
     });
     res.status(201).json({ message: 'Task logged successfully', data: newEntry });
   } catch (error) {
